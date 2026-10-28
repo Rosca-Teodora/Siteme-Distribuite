@@ -26,7 +26,7 @@ func main() {
 	}
 }
 
-// imi place mai mult prima varianta de rezolvare pentru ca se poate vedea concurenta goroutinelor mult mai clar in rulare
+// imi place mai mult prima varianta de rezolvare pentru ca se poate vedea concurenta goroutinelor mult mai clar in rulare (dar probabil varianta 2 e rezolvarea "ceruta" ca sa folosim close())
 
-// goroutina main are acces la canal si atunci cand goroutina secundara se afla in sleep, de aia in prima versiune de ex 4
+// in prima rezolvare goroutina main are acces la canal si atunci cand goroutina secundara se afla in sleep, de aia in prima versiune de ex 4
 // o sa se afiseze cel mai probabil mesajul "goroutina inca se afla in executie" macar o data
