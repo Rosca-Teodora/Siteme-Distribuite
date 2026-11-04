@@ -10,51 +10,84 @@ type Pachet struct {
 	done bool
 }
 
+type Conexiune struct {
+	ch       chan Pachet
+	src, dst int // id-urile nodurilor
+}
+
+func (conexiune Conexiune) returnNodMaxim() (nodMax int) {
+	if conexiune.src >= conexiune.dst {
+		return conexiune.src
+	}
+	return conexiune.dst
+}
+
 type Nod2 struct { // am modificat nodul a.i. sa primeasca un slice de canale
-	nodId          int
-	sendId, recvId int
-	status         bool
-	canale         []chan Pachet
+	nodId    int
+	maxId    int
+	status   bool
+	rounds   int
+	canale   []Conexiune
+	vecini   []int // important!!! un nod nu isi cunoaste vecinii de la inceput, ii deduce prin conexiunile pe care le are (ma gandeam ca un sistem nu ar avea de ce sa tina by default vecinii sai in retea) (asta si NU mai stateam sa ii hardcodez pe toti)
+	diametru int
 }
 
 // si acum chiar am nevoie de metoda pt adaugarea canalului in slice
-func (nod *Nod2) addCh(ch chan Pachet) {
+func (nod *Nod2) addCh(ch Conexiune) {
 	nod.canale = append(nod.canale, ch)
+}
+
+func (nod *Nod2) send(dst int) { // send(max_id, vecini iesire)
+	for i := 0; i <= len(nod.canale); i++ {
+		conexiuneCurenta := nod.canale[i]
+		if conexiuneCurenta.dst == dst {
+			conexiuneCurenta.ch <- Pachet{nod.maxId, nod.status}
+			return
+		}
+	}
+}
+
+func (nod *Nod2) getVecini() {
+	for i := 0; i <= len(nod.canale); i++ {
+		conexiuneCurenta := nod.canale[i]
+		if conexiuneCurenta.dst == nod.nodId {
+			nod.vecini = append(nod.vecini, conexiuneCurenta.dst)
+		}
+	}
 }
 
 func (nod *Nod2) transformare(_wg *sync.WaitGroup) {
 	defer _wg.Done()
-	nod.sendId = nod.nodId
+	nod.maxId = nod.nodId
+	nod.getVecini()
 
 	for true {
-		fmt.Printf("Nodul %d trimite: {%d, %t}\n", nod.nodId, nod.sendId, nod.status)
-		sendCh <- Pachet{nod.sendId, nod.status}
+		nod.rounds++
 
-		if nod.status {
-			return
-		}
+		for i := 0; i < len(nod.canale); i++ {
+			idC := nod.canale[i].returnNodMaxim()
 
-		pachetPrimit := <-recvCh
-
-		if pachetPrimit.done {
-			sendCh <- pachetPrimit
-			return
-		}
-
-		if pachetPrimit.id > nod.nodId {
-			nod.sendId = pachetPrimit.id
-		} else {
-			if pachetPrimit.id == nod.nodId {
-				nod.status = true
-				nod.sendId = pachetPrimit.id
-				fmt.Printf("Nodul %d s-a marcat ca lider!!!!\n", nod.nodId)
+			if idC > nod.maxId {
+				nod.maxId = idC
 			}
-			if pachetPrimit.id < nod.nodId {
-				nod.sendId = -1
+		}
+
+		if nod.rounds == nod.diametru {
+			if nod.maxId == nod.nodId {
+				nod.status = true
+				fmt.Printf("Nodul %d s-a marcat ca lider!!!!\n", nod.nodId)
+			} else {
+				nod.status = false
+			}
+		} else {
+			fmt.Printf("Nodul %d incepe sa trimita catre vecini:\n", nod.nodId)
+			for i := range nod.vecini {
+				vecin := nod.vecini[i]
+				nod.send(vecin)
+				fmt.Printf("maxId = %d, status = %t\n", nod.maxId, nod.status)
 			}
 		}
 	}
-
 }
 
 func main() {
