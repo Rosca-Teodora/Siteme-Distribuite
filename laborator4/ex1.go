@@ -1,6 +1,9 @@
 package main
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
 type Pachet struct {
 	id   int
@@ -15,7 +18,8 @@ type Nod struct {
 }
 
 func (nod *Nod) transformare(sendCh chan Pachet, recvCh chan Pachet) {
-	fmt.Printf("Nodul %d trimite: {%d, %t}", nod.nodId, nod.sendId, nod.status)
+	nod.sendId = nod.nodId
+	fmt.Printf("Nodul %d trimite: {%d, %t}\n", nod.nodId, nod.sendId, nod.status)
 
 	sendCh <- Pachet{nod.sendId, nod.status}
 	pachetPrimit := <-recvCh
@@ -26,7 +30,7 @@ func (nod *Nod) transformare(sendCh chan Pachet, recvCh chan Pachet) {
 		} else {
 			if pachetPrimit.id == nod.nodId {
 				nod.status = true
-				fmt.Printf("Nodul %d s-a marcat ca lider", nod.nodId)
+				fmt.Printf("Nodul %d s-a marcat ca lider\n", nod.nodId)
 			}
 			if pachetPrimit.id < nod.nodId {
 				nod.sendId = -1
@@ -44,6 +48,8 @@ func (nod *Nod) transformare(sendCh chan Pachet, recvCh chan Pachet) {
 // }
 
 func main() {
+	wg := sync.WaitGroup()
+
 	n1 := Nod{nodId: 7, nodDreaptaId: 4, nodStangaId: 1}
 	n2 := Nod{nodId: 4, nodDreaptaId: 9, nodStangaId: 7}
 	n3 := Nod{nodId: 9, nodDreaptaId: 2, nodStangaId: 4}
@@ -62,15 +68,15 @@ func main() {
 	var ch101 = make(chan Pachet, 10)
 	var ch17 = make(chan Pachet, 10)
 
-	ch74 <- Pachet{id: 1, done: false}
 	go n1.transformare(ch74, ch17)
-	go n2.transformare(ch49, ch92)
+	go n2.transformare(ch49, ch74)
 	go n3.transformare(ch92, ch49)
 	go n4.transformare(ch25, ch92)
 	go n5.transformare(ch533, ch25)
 	go n6.transformare(ch3310, ch533)
 	go n7.transformare(ch101, ch3310)
 	go n8.transformare(ch17, ch101)
+
 	// toate canalele unbuffered = blocking
 	// sugestie: buffer pt canale (n + 1 pt fiecare canal)
 }

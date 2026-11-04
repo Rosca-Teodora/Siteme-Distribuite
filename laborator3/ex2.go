@@ -1,14 +1,27 @@
+// 		P1
+// 	 / 		\
+// 	|		 P2
+// 	 \		/
+// 		P3
+
 package main
 
-type LamportClock struct{ c int }
+type LamportClock struct{ counter int }
 
-func (l *LamportClock) Tick() int { /* TODO */ return 0 }
+// incrementeaza contorul
+func (l *LamportClock) Tick() {
 
-func (l *LamportClock) Send() int { /* TODO */ return 0 }
+}
+func (l *LamportClock) Send()          {}
+func (l *LamportClock) Receive(ts int) {}
 
-func (l *LamportClock) Receive(ts int) int { /* TODO */ return 0 }
+type Message struct{ sender, ts int }
 
-type Event struct{ Proc, C int }
+type Event struct {
+	process          int
+	internal_counter int
+	kind             string // " internal ", "send", "recv"
+}
 
-// TODO: true daca a precede b in ordinea totala
+// TODO: retuneaza true daca a precede b
 func less(a, b Event) bool { return false }

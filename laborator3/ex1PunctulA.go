@@ -26,13 +26,16 @@ func measure(c_clock, s_clock *Clock) (theta, delta time.Duration) {
 	time.Sleep(3*time.Millisecond + time.Duration(rand.IntN(10))*time.
 		Millisecond)
 	t2 := s_clock.Now()
+
 	// Procesare intre 5 si 20 ms
 	time.Sleep(5*time.Millisecond + time.Duration(rand.IntN(20))*time.Millisecond)
 	t3 := s_clock.Now()
+
 	// Response
 	time.Sleep(3*time.Millisecond + time.Duration(rand.IntN(10))*time.
 		Millisecond)
 	t4 := c_clock.Now()
+
 	return estimate(t1, t2, t3, t4)
 }
 
@@ -40,5 +43,5 @@ func main() {
 	var c1 = Clock{offset: time.Duration(10)}
 	var c2 = Clock{offset: time.Duration(20)}
 
-	fmt.Print(measure(&c1, &c2))
+	fmt.Println(measure(&c1, &c2))
 }
