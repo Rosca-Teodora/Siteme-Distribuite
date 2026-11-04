@@ -3,6 +3,7 @@ package laborator5
 import (
 	"bufio"
 	"fmt"
+	"math"
 	"os"
 	"strconv"
 	"strings"
@@ -18,7 +19,7 @@ type Conexiune struct { // pastrez conexiunea mai clar astfel incat sa pot ident
 }
 
 type Robot struct {
-	x, y       int
+	poz        Pozitie
 	raza       int // raza pana la care vede un robot
 	comunicari []Conexiune
 }
@@ -37,9 +38,13 @@ func conversie(text string) int {
 func updateComunicare(roboti []Robot, raza int) {
 	for i := 0; i < len(roboti)-1; i++ {
 		robot1 := roboti[i]
+		x1, y1 := robot1.poz.x, robot1.poz.y
 
 		for j := i + 1; j < len(roboti); j++ {
+			robot2 := roboti[j]
+			x2, y2 := robot2.poz.x, robot2.poz.y
 
+			dist1la2 := math.Sqrt()
 		}
 	}
 }
