@@ -10,7 +10,7 @@ type LamportClock struct{ counter int }
 
 // incrementeaza contorul
 func (l *LamportClock) Tick() {
-
+	l.counter++
 }
 func (l *LamportClock) Send()          {}
 func (l *LamportClock) Receive(ts int) {}
