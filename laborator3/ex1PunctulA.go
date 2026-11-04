@@ -40,8 +40,13 @@ func measure(c_clock, s_clock *Clock) (theta, delta time.Duration) {
 }
 
 func main() {
-	var c1 = Clock{offset: time.Duration(10)}
-	var c2 = Clock{offset: time.Duration(20)}
+	var c1 = &Clock{offset: time.Duration(0)}
+	var c2 = &Clock{offset: time.Duration(100 * time.Millisecond)}
 
-	fmt.Println(measure(&c1, &c2))
+	fmt.Printf("offset initial: %v\n", c1.offset-c2.offset)
+
+	theta, delta := measure(c1, c2)
+	c2.offset += theta
+	difA := c1.offset - c2.offset
+	fmt.Printf("theta = %v, delta = %v, offset-ul ramas = %v\n", theta, delta, difA)
 }

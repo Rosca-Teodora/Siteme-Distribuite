@@ -40,33 +40,23 @@ func measure(c_clock, s_clock *Clock) (theta, delta time.Duration) {
 }
 
 func main() {
-	var c1 = Clock{offset: time.Duration(10)}
-	var c2 = Clock{offset: time.Duration(20)}
+	var c1 = &Clock{offset: time.Duration(0)}
+	var c2 = &Clock{offset: time.Duration(100 * time.Millisecond)}
 
-	thetaMin, deltaMin := measure(&c1, &c2)
+	thetaMin, deltaMin := measure(c1, c2)
 	i := 1
 	for i <= 9 {
-		thetaCurent, deltaCurent := measure(&c1, &c2)
+		thetaCurent, deltaCurent := measure(c1, c2)
 
 		if thetaCurent < thetaMin {
 			thetaMin = thetaCurent
 		}
 		if deltaCurent < deltaMin {
-			deltaCurent = deltaMin
+			deltaMin = deltaCurent
 		}
 
 		i += 1
 	}
 
-	fmt.Println(thetaMin, deltaMin)
+	fmt.Printf("theta minim: %v, delta minim: %v", thetaMin, deltaMin)
 }
-
-/*
-Rularea celor 2 puncte:
-teo@teo:~/Documents/SD/laborator3$ go run ex1PunctulA.go
-4.534581ms 15.704643ms
-teo@teo:~/Documents/SD/laborator3$ go run ex1PunctulB.go
--4.467439ms 8.852366ms
-
-delta si theta sunt cu mult mai mici dupa mai multe rulari, offset-ul se micsoreaza treptat (cel mai probabil asimptotic catre 0, dar niciodata zero)
-*/
