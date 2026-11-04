@@ -38,7 +38,7 @@ func (nod *Nod2) addCh(ch Conexiune) {
 }
 
 func (nod *Nod2) send(dst int) { // send(max_id, vecini iesire)
-	for i := 0; i <= len(nod.canale); i++ {
+	for i := 0; i < len(nod.canale); i++ {
 		conexiuneCurenta := nod.canale[i]
 		if conexiuneCurenta.dst == dst {
 			conexiuneCurenta.ch <- Pachet{nod.maxId, nod.status}
@@ -47,10 +47,24 @@ func (nod *Nod2) send(dst int) { // send(max_id, vecini iesire)
 	}
 }
 
-func (nod *Nod2) getVecini() {
-	for i := 0; i <= len(nod.canale); i++ {
+func (nod *Nod2) receive() []int {
+	multimeIds := make([]int, 0)
+
+	for i := 0; i < len(nod.canale); i++ {
 		conexiuneCurenta := nod.canale[i]
 		if conexiuneCurenta.dst == nod.nodId {
+			pachet := <-conexiuneCurenta.ch
+			multimeIds = append(multimeIds, pachet.id)
+		}
+	}
+
+	return multimeIds
+}
+
+func (nod *Nod2) getVecini() {
+	for i := 0; i < len(nod.canale); i++ {
+		conexiuneCurenta := nod.canale[i]
+		if conexiuneCurenta.src == nod.nodId {
 			nod.vecini = append(nod.vecini, conexiuneCurenta.dst)
 		}
 	}
@@ -61,11 +75,19 @@ func (nod *Nod2) transformare(_wg *sync.WaitGroup) {
 	nod.maxId = nod.nodId
 	nod.getVecini()
 
+	fmt.Printf("Prima trimitere, nodul %d trimite:\n", nod.nodId)
+	for i := range nod.vecini {
+		vecinC := nod.vecini[i]
+		nod.send(vecinC)
+		fmt.Printf("{maxId: %d, vecin: %d}\n", nod.maxId, vecinC)
+	}
+
 	for true {
 		nod.rounds++
+		received := nod.receive()
 
-		for i := 0; i < len(nod.canale); i++ {
-			idC := nod.canale[i].returnNodMaxim()
+		for i := 0; i < len(received); i++ {
+			idC := received[i]
 
 			if idC > nod.maxId {
 				nod.maxId = idC
@@ -79,6 +101,7 @@ func (nod *Nod2) transformare(_wg *sync.WaitGroup) {
 			} else {
 				nod.status = false
 			}
+			return
 		} else {
 			fmt.Printf("Nodul %d incepe sa trimita catre vecini:\n", nod.nodId)
 			for i := range nod.vecini {
@@ -93,35 +116,31 @@ func (nod *Nod2) transformare(_wg *sync.WaitGroup) {
 func main() {
 	_wg := sync.WaitGroup{}
 
-	n1 := Nod{nodId: 7, nodDreaptaId: 4, nodStangaId: 1}
-	n2 := Nod{nodId: 4, nodDreaptaId: 9, nodStangaId: 7}
-	n3 := Nod{nodId: 9, nodDreaptaId: 2, nodStangaId: 4}
-	n4 := Nod{nodId: 2, nodDreaptaId: 5, nodStangaId: 9}
-	n5 := Nod{nodId: 5, nodDreaptaId: 33, nodStangaId: 2}
-	n6 := Nod{nodId: 33, nodDreaptaId: 10, nodStangaId: 5}
-	n7 := Nod{nodId: 10, nodDreaptaId: 4, nodStangaId: 33}
-	n8 := Nod{nodId: 1, nodDreaptaId: 7, nodStangaId: 10}
+	diam := 4
+	ids := []int{9, 2, 6, 14, 4, 3, 17, 8, 22, 19}
+	muchii := [][2]int{
+		// exterior
+		{9, 2}, {2, 6}, {6, 14}, {14, 4}, {4, 3},
+		{3, 17}, {17, 8}, {8, 22}, {22, 19}, {19, 9},
+		// interior
+		{9, 14}, {2, 4}, {6, 3}, {14, 17}, {4, 8},
+		{3, 22}, {17, 19}, {8, 9}, {22, 2}, {19, 6},
+	}
 
-	var ch74 = make(chan Pachet, 10)
-	var ch49 = make(chan Pachet, 10)
-	var ch92 = make(chan Pachet, 10)
-	var ch25 = make(chan Pachet, 10)
-	var ch533 = make(chan Pachet, 10)
-	var ch3310 = make(chan Pachet, 10)
-	var ch101 = make(chan Pachet, 10)
-	var ch17 = make(chan Pachet, 10)
+	noduri := map[int]*Nod2{}
+	for _, id := range ids {
+		noduri[id] = &Nod2{nodId: id, diametru: diam}
+	}
 
-	_wg.Add(8)
-	go n1.transformare(ch74, ch17, &_wg)
-	go n2.transformare(ch49, ch74, &_wg)
-	go n3.transformare(ch92, ch49, &_wg)
-	go n4.transformare(ch25, ch92, &_wg)
-	go n5.transformare(ch533, ch25, &_wg)
-	go n6.transformare(ch3310, ch533, &_wg)
-	go n7.transformare(ch101, ch3310, &_wg)
-	go n8.transformare(ch17, ch101, &_wg)
+	for _, m := range muchii {
+		c := Conexiune{ch: make(chan Pachet, len(ids)+1), src: m[0], dst: m[1]}
+		noduri[m[0]].addCh(c) // sursa are canalul ca iesire
+		noduri[m[1]].addCh(c) // destinatia il are ca intrare
+	}
+
+	_wg.Add(len(ids))
+	for _, id := range ids {
+		go noduri[id].transformare(&_wg)
+	}
 	_wg.Wait()
-
-	// toate canalele unbuffered = blocking
-	// sugestie: buffer pt canale (n + 1 pt fiecare canal)
 }
