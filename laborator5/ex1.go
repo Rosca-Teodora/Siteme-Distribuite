@@ -34,7 +34,7 @@ func (robot *Robot) send(runda Runda) {
 }
 
 func (robot *Robot) recv(runda Runda) []Pozitie {
-	pozitii := make([]Pozitie, len(runda.canaleIntrare))
+	pozitii := make([]Pozitie, 0, len(runda.canaleIntrare))
 
 	for _, canal := range runda.canaleIntrare {
 		pozitii = append(pozitii, <-canal)
@@ -69,7 +69,7 @@ func updateComunicare(roboti []Robot) ([]Runda, int) {
 			x2, y2 := robot2.poz.x, robot2.poz.y
 
 			distDeLa1La2 := math.Sqrt(math.Pow((x1-x2), 2) + math.Pow((y1-y2), 2))
-			fmt.Printf("distanta dintre robot%d robot%d este: %.2f\n", robot1.id, robot2.id, distDeLa1La2)
+			//fmt.Printf("distanta dintre robot%d robot%d este: %.2f\n", robot1.id, robot2.id, distDeLa1La2)
 			if distDeLa1La2 <= float64(robot1.raza) {
 				ch1 := make(chan Pozitie, 1) // de la i la j
 				ch2 := make(chan Pozitie, 1) // de la j la i
@@ -153,7 +153,7 @@ func main() {
 
 		xC, _ := strconv.ParseFloat(line[0], 64)
 		yC, _ := strconv.ParseFloat(line[1], 64)
-		roboti = append(roboti, Robot{id: i + 1, poz: Pozitie{xC, yC}, raza: r})
+		roboti = append(roboti, Robot{id: i + 1, poz: Pozitie{xC, yC}, raza: r, chTopologiiRunde: make(chan Runda)})
 	}
 
 	printRoboti(n, roboti)
@@ -169,6 +169,7 @@ func main() {
 	}
 
 	muchiiAnterior := 0
+	diametruAnterior := returnDiametru(roboti)
 	for runda := 1; runda <= maxRunde; runda++ {
 		topologieCurenta, muchii := updateComunicare(roboti) // update comunicare returneaza toate rundele
 		if muchii != muchiiAnterior {
@@ -189,6 +190,12 @@ func main() {
 			fmt.Printf("Robotii converg intr-un singur punct dupa %d runde", runda)
 			break
 		}
+		if returnDiametru(roboti) == diametruAnterior {
+			fmt.Print("Unii roboti nu se mai vad, deadlock")
+			break
+		}
+
+		diametruAnterior = returnDiametru(roboti)
 	}
 
 	for i := range roboti {
