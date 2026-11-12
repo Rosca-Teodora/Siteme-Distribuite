@@ -22,7 +22,7 @@ type Runda struct {
 type Robot struct {
 	id               int
 	poz              Pozitie
-	raza             int // raza pana la care vede un robot
+	raza             float64 // raza pana la care vede un robot
 	rounds           int
 	chTopologiiRunde chan Runda
 }
@@ -69,15 +69,15 @@ func updateComunicare(roboti []Robot) ([]Runda, int) {
 			x2, y2 := robot2.poz.x, robot2.poz.y
 
 			distDeLa1La2 := math.Sqrt(math.Pow((x1-x2), 2) + math.Pow((y1-y2), 2))
-			fmt.Printf("pt robotul cu id-ul %d si id-ul %d distanta este: %.2f\n", robot1.id, robot2.id, distDeLa1La2)
+			fmt.Printf("distanta dintre robot%d robot%d este: %.2f\n", robot1.id, robot2.id, distDeLa1La2)
 			if distDeLa1La2 <= float64(robot1.raza) {
 				ch1 := make(chan Pozitie, 1) // de la i la j
 				ch2 := make(chan Pozitie, 1) // de la j la i
 
-				runde[i].canaleIesire = append(robot1.canaleIesire, ch1)
-				runde[j].canaleIntrare = append(robot1.canaleIntrare, ch1)
-				runde[j].canaleIesire = append(robot2.canaleIesire, ch2)
-				runde[i].canaleIntrare = append(robot2.canaleIntrare, ch2)
+				runde[i].canaleIesire = append(runde[i].canaleIesire, ch1)
+				runde[j].canaleIntrare = append(runde[j].canaleIntrare, ch1)
+				runde[j].canaleIesire = append(runde[j].canaleIesire, ch2)
+				runde[i].canaleIntrare = append(runde[i].canaleIntrare, ch2)
 				muchii++
 			}
 		}
@@ -124,14 +124,16 @@ func returnDiametru(roboti []Robot) float64 {
 func printRoboti(n int, roboti []Robot) {
 	fmt.Println(n)
 	for _, robot := range roboti {
-		fmt.Printf("robotul %d(%.2f, %.2f)", robot.id, robot.poz.x, robot.poz.y)
+		fmt.Printf("robotul %d(%.2f, %.2f)\n", robot.id, robot.poz.x, robot.poz.y)
 	}
 	fmt.Println()
 }
 
 func main() {
 	roboti := make([]Robot, 0)
-	r := 11
+	r := 11.0
+	epsilon := 0.00000001
+	maxRunde := 1000
 
 	input, err := os.Open("input.in")
 	if err != nil {
@@ -152,11 +154,46 @@ func main() {
 		xC, _ := strconv.ParseFloat(line[0], 64)
 		yC, _ := strconv.ParseFloat(line[1], 64)
 		roboti = append(roboti, Robot{id: i + 1, poz: Pozitie{xC, yC}, raza: r})
-		roboti[i].canaleIesire = make([]chan Pozitie, 0)
-		roboti[i].canaleIntrare = make([]chan Pozitie, 0)
 	}
 
 	printRoboti(n, roboti)
 	updateComunicare(roboti)
 	printRoboti(n, roboti)
+
+	status := make(chan struct{})
+	_wg := sync.WaitGroup{}
+
+	for i := range roboti {
+		_wg.Add(1)
+		go roboti[i].transformare(status, &_wg)
+	}
+
+	muchiiAnterior := 0
+	for runda := 1; runda <= maxRunde; runda++ {
+		topologieCurenta, muchii := updateComunicare(roboti) // update comunicare returneaza toate rundele
+		if muchii != muchiiAnterior {
+			muchiiAnterior = muchii
+		}
+
+		for i := 0; i < len(roboti); i++ {
+			roboti[i].chTopologiiRunde <- topologieCurenta[i]
+		}
+		for i := 0; i < n; i++ {
+			_ = <-status //
+		}
+
+		fmt.Printf("Runda %d:\n", runda)
+		printRoboti(n, roboti)
+
+		if returnDiametru(roboti) <= epsilon {
+			fmt.Printf("Robotii converg intr-un singur punct dupa %d runde", runda)
+			break
+		}
+	}
+
+	for i := range roboti {
+		close(roboti[i].chTopologiiRunde)
+	}
+
+	_wg.Wait()
 }
