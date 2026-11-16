@@ -1,101 +1,158 @@
+// NU m-as fi prins de capul meu ca structura asta simuleaza un set daca nu auzeam intrebarea lui Fernando la finalul laboratorului
+// util: https://codesignal.com/learn/courses/mastering-complex-data-structures-in-go/lessons/simulating-sets-in-go-using-maps
+
 package main
 
 import (
+	"bufio"
 	"fmt"
-	"sync"
+	"strconv"
+	"strings"
+
+	//"sync"
+	"os"
 )
 
-type Pachet struct {
-	id   int
-	v    int
-}
+// func (nod *Nod) transformare(sendCh chan Pachet, recvCh chan Pachet, _wg *sync.WaitGroup, nrCrash int, s int) {
+// 	defer _wg.Done()
+// 	nod.sendId = nod.nodId
 
-func (p Pachet) equals(b Pachet) {
-	if p.id == b.id && p.v == b.v && 
-}
+// 	// momentan nu opresc crashul nodurilor...
+// 	sansaCrash := rand.intN(100)
+// 	if sansaCrash < nrCrash {
+// 		return // nodul nu mai e functional deci ies din goroutina
+// 	}
 
-type Nod struct {
-	nodId, nodDreaptaId, nodStangaId int
-	sendId, recvId                   int
-	status                           bool
-	multimeNod                       []Pachet
-	rounds                           int // variabila t = initial 0 
-}
+// 	for true {
+// 		fmt.Printf("Nodul %d trimite: {%d, %t}\n", nod.nodId, nod.sendId, nod.status)
+// 		sendCh <- Pachet{nod.sendId, nod.status}
 
-func (nod *Nod) transformare(sendCh chan Pachet, recvCh chan Pachet, _wg *sync.WaitGroup, nrCrash int, s int) {
-	defer _wg.Done()
-	nod.sendId = nod.nodId
+// 		if nod.status {
+// 			return
+// 		}
 
-	// momentan nu opresc crashul nodurilor...
-	sansaCrash := rand.intN(100)
-	if sansaCrash < nrCrash {
-		return // nodul nu mai e functional deci ies din goroutina 
-	}
+// 		pachetPrimit := <-recvCh
 
-	for true {
-		fmt.Printf("Nodul %d trimite: {%d, %t}\n", nod.nodId, nod.sendId, nod.status)
-		sendCh <- Pachet{nod.sendId, nod.status}
+// 		if pachetPrimit.done {
+// 			sendCh <- pachetPrimit
+// 			return
+// 		}
 
-		if nod.status {
-			return
+// 		if pachetPrimit.id > nod.nodId {
+// 			nod.sendId = pachetPrimit.id
+// 		} else {
+// 			if pachetPrimit.id == nod.nodId {
+// 				nod.status = true
+// 				nod.sendId = pachetPrimit.id
+// 				fmt.Printf("Nodul %d s-a marcat ca lider!!!!\n", nod.nodId)
+// 			}
+// 			if pachetPrimit.id < nod.nodId {
+// 				nod.sendId = -1
+// 			}
+// 		}
+// 	}
+
+// }
+
+func diametru(adj [][]int) int {
+	n := len(adj)
+	diam := 0
+
+	for src := 0; src < n; src++ {
+		// BFS din nodul src
+		dist := make([]int, n)
+		for i := range dist {
+			dist[i] = -1
 		}
-
-		pachetPrimit := <-recvCh
-
-		if pachetPrimit.done {
-			sendCh <- pachetPrimit
-			return
-		}
-
-		if pachetPrimit.id > nod.nodId {
-			nod.sendId = pachetPrimit.id
-		} else {
-			if pachetPrimit.id == nod.nodId {
-				nod.status = true
-				nod.sendId = pachetPrimit.id
-				fmt.Printf("Nodul %d s-a marcat ca lider!!!!\n", nod.nodId)
+		dist[src] = 0
+		queue := []int{src}
+		for len(queue) > 0 {
+			u := queue[0]
+			queue = queue[1:]
+			for _, v := range adj[u] {
+				if dist[v] == -1 {
+					dist[v] = dist[u] + 1
+					queue = append(queue, v)
+				}
 			}
-			if pachetPrimit.id < nod.nodId {
-				nod.sendId = -1
+		}
+		for _, d := range dist {
+			if d == -1 {
+				return -1 // avem un nod la care nu putem ajunge din src
+			}
+			if d > diam {
+				diam = d
 			}
 		}
 	}
+	return diam
+}
 
+// Info reprezinta o pereche (id , valoare ) retinuta in memoria unui nod.
+type Info struct {
+	ID    int
+	Value int
+}
+
+// Memory este o multime de token -uri ( reuniunea se face prin inserare ).
+type Memory struct {
+	elements map[Info]struct{}
+}
+
+func NewMemory() *Memory {
+	return &Memory{elements: make(map[Info]struct{})}
+}
+
+func (m *Memory) Add(inf Info) {
+	m.elements[inf] = struct{}{}
+}
+
+func (m *Memory) Has(inf Info) bool {
+	_, exista := m.elements[inf]
+	return exista
+}
+
+func (m *Memory) Union(m2 *Memory) *Memory {
+	result := NewMemory()
+	for v := range m.elements {
+		result.Add(v)
+	}
+	for v := range m2.elements {
+		result.Add(v)
+	}
+	return result
+}
+
+type Node struct {
+	ID        int
+	Neighbors []int
+	M         *Memory
 }
 
 func main() {
-	_wg := sync.WaitGroup{}
-	s := 3
+	fisier, err := os.Open("input1.in")
+	if err != nil {
+		fmt.Println("Eroare la citire")
+		return
+	}
+	defer fisier.Close()
 
-	n1 := Nod{nodId: 7, nodDreaptaId: 4, nodStangaId: 1, rounds: 0}
-	n2 := Nod{nodId: 4, nodDreaptaId: 9, nodStangaId: 7, rounds: 0}
-	n3 := Nod{nodId: 9, nodDreaptaId: 2, nodStangaId: 4, rounds: 0}
-	n4 := Nod{nodId: 2, nodDreaptaId: 5, nodStangaId: 9, rounds: 0}
-	n5 := Nod{nodId: 5, nodDreaptaId: 33, nodStangaId: 2, rounds: 0}
-	n6 := Nod{nodId: 33, nodDreaptaId: 10, nodStangaId: 5, rounds: 0}
-	n7 := Nod{nodId: 10, nodDreaptaId: 4, nodStangaId: 33, rounds: 0}
-	n8 := Nod{nodId: 1, nodDreaptaId: 7, nodStangaId: 10, rounds: 0}
+	scanner := bufio.NewScanner(fisier)
+	scanner.Scan()
+	line := strings.Fields(scanner.Text())
+	n, _ := strconv.ParseInt(line[0], 10, 0)
+	s, _ := strconv.ParseInt(line[1], 10, 0)
 
-	var ch74 = make(chan Pachet, 10)
-	var ch49 = make(chan Pachet, 10)
-	var ch92 = make(chan Pachet, 10)
-	var ch25 = make(chan Pachet, 10)
-	var ch533 = make(chan Pachet, 10)
-	var ch3310 = make(chan Pachet, 10)
-	var ch101 = make(chan Pachet, 10)
-	var ch17 = make(chan Pachet, 10)
+	scanner.Scan()
+	line = strings.Fields(scanner.Text())
+	nodes := make([]Node, 0, n)
+	for i := range line {
+		nodId := i
+		valoare, _ := strconv.ParseInt(line[i], 10, 0)
+		vecini := make([]int, 0)
+		mem := NewMemory()
+		mem.Add(Info{ID: nodId, Value: int(valoare)})
 
-	_wg.Add(8)
-	go n1.transformare(ch74, ch17, &_wg, 2, s)
-	go n2.transformare(ch49, ch74, &_wg, 2, s)
-	go n3.transformare(ch92, ch49, &_wg, 2, s)
-	go n4.transformare(ch25, ch92, &_wg, 2, s)
-	go n5.transformare(ch533, ch25, &_wg, 2, s)
-	go n6.transformare(ch3310, ch533, &_wg, 2, s)
-	go n7.transformare(ch101, ch3310, &_wg, 2, s)
-	go n8.transformare(ch17, ch101, &_wg, 2, s)
-	_wg.Wait()
-
-	// toate canalele unbuffered = blocking
-	// sugestie: buffer pt canale (n + 1 pt fiecare canal)
+		nodes = append(nodes, Node{ID: nodId, Neighbors: vecini, M: mem})
+	}
 }
