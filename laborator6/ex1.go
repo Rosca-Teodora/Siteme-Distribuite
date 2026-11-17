@@ -6,11 +6,13 @@ package main
 import (
 	"bufio"
 	"fmt"
+	"math/rand/v2"
+	"os"
+	"slices"
 	"strconv"
 	"strings"
-
-	//"sync"
-	"os"
+	"sync"
+	"sync/atomic"
 )
 
 // func (nod *Nod) transformare(sendCh chan Pachet, recvCh chan Pachet, _wg *sync.WaitGroup, nrCrash int, s int) {
@@ -53,6 +55,18 @@ import (
 // 	}
 
 // }
+
+func gambleCrash(s int, sCurent *atomic.Int32) bool {
+	if int(sCurent.Load()) >= s {
+		return false
+	}
+
+	p := rand.IntN(100) //
+	if p <= 1 {
+		return true
+	}
+	return false
+}
 
 func diametru(adj [][]int) int {
 	n := len(adj)
@@ -123,13 +137,113 @@ func (m *Memory) Union(m2 *Memory) *Memory {
 	return result
 }
 
+func (m *Memory) Sort() []Info {
+	mem := make([]Info, 0, len(m.elements))
+
+	for i := range m.elements {
+		mem = append(mem, i)
+	}
+	slices.SortFunc(mem, func(a, b Info) int { return a.ID - b.ID })
+
+	return mem
+}
+
 type Node struct {
 	ID        int
 	Neighbors []int
 	M         *Memory
+	rounds    int
+	crashed   bool
+}
+
+func (nod *Node) transformare(recv []chan *Memory, send []chan *Memory, memorieFinala *Memory, s int, sCurent *atomic.Int32, maximRunde int, wg *sync.WaitGroup) {
+	defer wg.Done()
+
+	for true {
+		for _, ch := range send { // Broadcast(Mi(t))
+			ch <- nod.M
+		}
+
+		if gambleCrash(s, sCurent) { // nodul a dat crash
+			sCurent.Add(1)
+
+			// inchide canalele
+			for _, ch := range send {
+				close(ch)
+			}
+			nod.crashed = true
+
+			return
+		}
+
+		for _, ch := range recv {
+			msj, ok := <-ch
+			if ok { // daca nu atunci "panic: runtime error: invalid memory address or nil pointer dereference" fiindca iau si canale inchise
+				nod.M = nod.M.Union(msj)
+			}
+		}
+
+		if !(nod.rounds < maximRunde) {
+			return
+		}
+
+		nod.rounds += 1
+	}
+}
+
+func stringToInt(c string) int {
+	cInt64, _ := strconv.ParseInt(c, 10, 0)
+	return int(cInt64)
+}
+
+func startFlooding(n int, adj [][]int, nodes []Node, s int) *Memory {
+	var wg sync.WaitGroup
+	var sCurent atomic.Int32
+	memFin := NewMemory()
+	maximRunde := (s + 1) * diametru(adj)
+
+	// initializare matrice de canale
+	canale := make([][]chan *Memory, n)
+	for i := range n {
+		canale[i] = make([]chan *Memory, n)
+		for j := range n {
+			canale[i][j] = make(chan *Memory, maximRunde+1)
+		}
+	}
+
+	for i := range n {
+		var send []chan *Memory
+		var recv []chan *Memory
+
+		for _, j := range adj[i] {
+			send = append(send, canale[i][j])
+		}
+
+		for k := range n {
+			for _, j := range adj[k] {
+				if j == i {
+					recv = append(recv, canale[k][j])
+				}
+			}
+		}
+
+		wg.Add(1)
+		go nodes[i].transformare(recv, send, memFin, s, &sCurent, maximRunde, &wg)
+	}
+
+	wg.Wait()
+
+	for i := range nodes {
+		if !nodes[i].crashed {
+			return nodes[i].M // initial luam o valoare dar nu o dadeam ca pointer deci nu se schimba si asa e mai usor sa iau pur si simplu elementele din memoria primului nod care nu a picat
+		}
+	}
+	return NewMemory() // "missing return" real nu ar tb sa se intample pe date care verifica conditiile dar compiler
 }
 
 func main() {
+	var adj [][]int
+
 	fisier, err := os.Open("input1.in")
 	if err != nil {
 		fmt.Println("Eroare la citire")
@@ -140,8 +254,9 @@ func main() {
 	scanner := bufio.NewScanner(fisier)
 	scanner.Scan()
 	line := strings.Fields(scanner.Text())
-	n, _ := strconv.ParseInt(line[0], 10, 0)
-	s, _ := strconv.ParseInt(line[1], 10, 0)
+
+	n := stringToInt(line[0])
+	s := stringToInt(line[1])
 
 	scanner.Scan()
 	line = strings.Fields(scanner.Text())
@@ -153,6 +268,33 @@ func main() {
 		mem := NewMemory()
 		mem.Add(Info{ID: nodId, Value: int(valoare)})
 
-		nodes = append(nodes, Node{ID: nodId, Neighbors: vecini, M: mem})
+		nodes = append(nodes, Node{ID: nodId, Neighbors: vecini, M: mem, rounds: 0, crashed: false})
 	}
+
+	for i := 0; i < n; i++ {
+		scanner.Scan()
+		line = strings.Fields(scanner.Text())
+
+		convertedLine := make([]int, 0)
+		for j := range line {
+			conv := stringToInt(line[j])
+			convertedLine = append(convertedLine, conv)
+		}
+		adj = append(adj, convertedLine)
+	}
+
+	//fmt.Println(adj)
+	fmt.Println(diametru(adj))
+
+	memFin := startFlooding(n, adj, nodes, s)
+	for _, i := range memFin.Sort() {
+		fmt.Printf("(%d, %d)", i.ID, i.Value)
+	}
+	fmt.Print("\n")
+	for i := range nodes {
+		if nodes[i].crashed {
+			fmt.Printf("nodul %d a dat crash\n", nodes[i].ID)
+		}
+	}
+
 }
